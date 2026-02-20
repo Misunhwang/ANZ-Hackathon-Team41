@@ -94,7 +94,17 @@ def invoke_agent_stream_with_citations(question: str, session_id: str):
 # Streamlit UI
 # ======================
 st.set_page_config(page_title="Smart Audit Assistant", page_icon="🤖", layout="centered")
-st.title("Smart Audit Assistant  FAQ BOT")
+
+# Main Header
+st.markdown(
+    """
+    <h1 style='text-align: center; margin-bottom: 0;'>Auditing Smart FAQ Bot</h1>
+    <p style='text-align: center; font-size:18px; color: gray; margin-top: 5px;'>
+        Ask questions about policies, SOPs, donor rules, and audit reports
+    </p>
+    """,
+    unsafe_allow_html=True
+)
 
 with st.sidebar:
     st.subheader("Settings")
