@@ -83,6 +83,17 @@ def _short_name(uri: str) -> str:
     """Convert an S3 URI to a display-friendly file name."""
     return uri.split("/")[-1] if uri else uri
 
+def _prompt_icon(title: str) -> str:
+    t = title.lower()
+    if "password" in t:
+        return "🔐"   # security
+    if "leave" in t:
+        return "🧑‍💼"  # HR
+    if "approval" in t:
+        return "✅"   # controls/approval
+    if "quote" in t or "bidding" in t or "procurement" in t:
+        return "📑"   # procurement docs
+    return "🔎"       # default audit/review
 
 def render_suggested_prompts(prompts):
     """Render prompt cards and store the selected prompt in session state."""
@@ -134,12 +145,13 @@ def render_suggested_prompts(prompts):
     cols = st.columns(3)
     for i, (title, question) in enumerate(prompts):
         with cols[i % 3]:
-            label = f"{title}\n{question}"
+            icon = _prompt_icon(title)
+            label = f"{icon} {title}\n{question}"
             if st.button(label, key=f"sp_{i}", use_container_width=True):
                 st.session_state.selected_prompt = question
 
 
-st.set_page_config(page_title="Auditing Smart FAQ Bot", page_icon="🤖", layout="centered")
+st.set_page_config(page_title="Auditing Smart FAQ Bot", page_icon="⚖️", layout="centered")
 
 st.markdown(
     """
@@ -175,7 +187,7 @@ with st.sidebar:
             font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
         ">
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
-                <div style="font-size:22px;">🤖</div>
+                <div style="font-size:22px;">⚖️</div>
                 <div style="font-weight:800; font-size:15px; color:#0f172a;">
                     Smart Auditing Assistant
                 </div>
@@ -216,8 +228,14 @@ if "selected_prompt" not in st.session_state:
 
 render_suggested_prompts(SUGGESTED_PROMPTS)
 
+ROLE_AVATAR = {
+    "user": "🔎",
+    "assistant": "📑",
+}
+
 for m in st.session_state.messages:
-    with st.chat_message(m["role"]):
+    role = m["role"]
+    with st.chat_message(role, avatar=ROLE_AVATAR.get(role)):
         st.markdown(m["content"])
         if m.get("citations"):
             st.caption("Sources: " + " | ".join(m["citations"]))
@@ -232,10 +250,11 @@ if selected_prompt and not typed_input:
 
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar="🔎"):
         st.markdown(user_input)
 
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar="📑"):
+        
         placeholder = st.empty()
         acc = ""
         citations = []
