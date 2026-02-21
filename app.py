@@ -3,6 +3,7 @@ import uuid
 import boto3
 import streamlit as st
 from dotenv import load_dotenv
+import streamlit.components.v1 as components  # ✅ 추가
 
 # ======================
 # Configuration
@@ -19,11 +20,12 @@ AGENT_ALIAS_ID = os.getenv("BEDROCK_AGENT_ALIAS_ID")
 # ======================
 
 SUGGESTED_PROMPTS = [
-    ("Ask about IT Policy effective date", "What is the effective date of the IT Policy?"),
-    ("Password rules", "What are the password requirements in the IT Security Policy?"),
-    ("Procurement threshold", "What is the approval threshold for procurement purchases?"),
-    ("Donor rules", "What donor compliance rules apply to restricted funding?"),
-    ("Audit report access", "Who is allowed to access internal audit reports and under what conditions?"),
+    ("Bidding Threshold", "What is the procurement threshold for competitive bidding?"),
+    ("Three-Quote Rule", "How many quotations are required for purchases above R10,000?"),
+    ("Approval Limits", "What are the approval limits for procurement transactions by role?"),
+    ("Segregation of Duties", "What segregation of duties controls are required in financial processes?"),
+    ("Password Rules", "What are the password complexity requirements?"),
+    ("Leave Types", "What types of leave are available under the HR Policy?"),
 ]
 
 # ======================
@@ -60,7 +62,6 @@ def _collect_citation_uris_from_trace(trace_obj, seen: set, uris: list):
 
     walk(trace_obj)
 
-
 def invoke_agent_stream_with_citations(question: str, session_id: str):
     client = get_client()
 
@@ -86,19 +87,16 @@ def invoke_agent_stream_with_citations(question: str, session_id: str):
 
     yield ("done", {"citations": citations, "trace_events": trace_events})
 
-
 def _short_name(uri: str) -> str:
     return uri.split("/")[-1] if uri else uri
 
-
 # ======================
-# Copilot-style Suggested Prompt Cards (session_state, minimal flicker)
+# Copilot-style Suggested Prompt Cards
 # ======================
 
 def render_suggested_prompts(prompts):
     st.markdown("### 💡 Suggested Prompts")
 
-    # ✅ 핵심: button 뿐 아니라 button 내부 텍스트 컨테이너(div/span)에도 스타일 적용
     st.markdown(
         """
         <style>
@@ -120,14 +118,12 @@ def render_suggested_prompts(prompts):
             border-color: rgba(49, 51, 63, 0.30) !important;
         }
 
-        /* IMPORTANT: The text is usually inside a child div/span. Style those, not only the button. */
+        /* Default = question style */
         div.stButton > button > div,
         div.stButton > button > span,
         div.stButton > button p {
-            white-space: pre-line !important;   /* keep \n line breaks */
+            white-space: pre-line !important;
             line-height: 1.25 !important;
-
-            /* Default = question style */
             font-weight: 400 !important;
             font-size: 13.5px !important;
             color: rgba(49, 51, 63, 0.70) !important;
@@ -137,13 +133,12 @@ def render_suggested_prompts(prompts):
         div.stButton > button > div::first-line,
         div.stButton > button > span::first-line,
         div.stButton > button p::first-line,
-        div.stButton > button::first-line {  /* fallback */
+        div.stButton > button::first-line {
             font-weight: 700 !important;
             font-size: 15px !important;
             color: rgba(15, 23, 42, 0.95) !important;
         }
 
-        /* Softer focus */
         div.stButton > button:focus {
             outline: 2px solid rgba(0,0,0,0.12);
         }
@@ -155,11 +150,9 @@ def render_suggested_prompts(prompts):
     cols = st.columns(3)
     for i, (title, question) in enumerate(prompts):
         with cols[i % 3]:
-            # ✅ 두 줄 텍스트: 첫 줄=Title, 둘째 줄=Question
             label = f"💬 {title}\n{question}"
             if st.button(label, key=f"sp_{i}", use_container_width=True):
                 st.session_state.selected_prompt = question
-
 
 # ======================
 # Streamlit UI
@@ -191,6 +184,48 @@ with st.sidebar:
         st.session_state.selected_prompt = None
         st.rerun()
 
+    # ✅ 확실한 HTML 렌더링 (텍스트로 안 보이게)
+    components.html(
+        """
+        <div style="
+            margin-top: 16px;
+            padding: 16px 14px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        ">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                <div style="font-size:22px;">🤖</div>
+                <div style="font-weight:800; font-size:15px; color:#0f172a;">
+                    Smart Auditing Assistant
+                </div>
+            </div>
+
+            <div style="font-size:12.5px; color:#475569; line-height:1.45; margin-bottom:12px;">
+                Powered by AWS AI Services:<br/>
+                <span style="font-weight:600;">Bedrock</span> ·
+                <span style="font-weight:600;">Knowledge Bases</span> ·
+                <span style="font-weight:600;">S3</span> ·
+                <span style="font-weight:600;">Lambda</span> ·
+                <span style="font-weight:600;">OpenSearch</span> ·
+                <span style="font-weight:600;">Lightsail</span>
+            </div>
+
+            <div style="font-size:13px; line-height:1.55; margin-bottom:10px;">
+                <span style="color:#dc2626; font-weight:800;">STOP</span>
+                <span style="color:#0f172a;"> searching through PDFs.</span><br/>
+                <span style="color:#16a34a; font-weight:800;">START</span>
+                <span style="color:#0f172a;"> asking questions.</span>
+            </div>
+
+            <div style="font-size:12.5px; color:#475569; line-height:1.45;">
+                Get instant, accurate answers with source citations from your audit documentation.
+            </div>
+        </div>
+        """,
+        height=230,  # ✅ 필요하면 240~280으로 조정
+    )
+
 # Initialize session state
 if "session_id" not in st.session_state:
     st.session_state.session_id = f"web-{uuid.uuid4()}"
@@ -216,17 +251,15 @@ typed_input = st.chat_input("Ask a question from the FAQ PDF (e.g., refund polic
 selected_prompt = st.session_state.get("selected_prompt")
 user_input = typed_input if typed_input else selected_prompt
 
-# Clear selected prompt after use (prevents re-sending on rerun)
+# Clear selected prompt after use
 if selected_prompt and not typed_input:
     st.session_state.selected_prompt = None
 
 if user_input:
-    # Store and display the user message
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Stream and display assistant response + citations + progress
     with st.chat_message("assistant"):
         placeholder = st.empty()
         acc = ""
@@ -268,13 +301,11 @@ if user_input:
         else:
             status.update(label="No response returned", state="error")
 
-        # Show citations under the final answer (short)
         short_cites = []
         if citations:
             short_cites = [_short_name(u) for u in citations[:2]]
             st.caption("Sources: " + " | ".join(short_cites))
 
-        # Save assistant message (with citations)
         if acc.strip():
             st.session_state.messages.append(
                 {"role": "assistant", "content": acc, "citations": short_cites}
