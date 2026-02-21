@@ -3,21 +3,13 @@ import uuid
 import boto3
 import streamlit as st
 from dotenv import load_dotenv
-import streamlit.components.v1 as components  # ✅ 추가
-
-# ======================
-# Configuration
-# ======================
+import streamlit.components.v1 as components  # HTML rendering helper for sidebar content
 
 load_dotenv()
 
 REGION = os.getenv("AWS_REGION")
 AGENT_ID = os.getenv("BEDROCK_AGENT_ID")
 AGENT_ALIAS_ID = os.getenv("BEDROCK_AGENT_ALIAS_ID")
-
-# ======================
-# Suggested Prompts (Title, Question)
-# ======================
 
 SUGGESTED_PROMPTS = [
     ("Bidding Threshold", "What is the procurement threshold for competitive bidding?"),
@@ -28,18 +20,15 @@ SUGGESTED_PROMPTS = [
     ("Leave Types", "What types of leave are available under the HR Policy?"),
 ]
 
-# ======================
-# AWS Client
-# ======================
 
 def get_client():
+    """Create a Bedrock Agent Runtime client for the configured region."""
     return boto3.client("bedrock-agent-runtime", region_name=REGION)
 
-# ======================
-# Trace-only citation extraction (NO direct KB calls)
-# ======================
 
 def _collect_citation_uris_from_trace(trace_obj, seen: set, uris: list):
+    """Collect unique S3 URIs from an agent trace object (best-effort, schema-agnostic)."""
+
     def add_uri(uri: str):
         if uri and uri not in seen:
             seen.add(uri)
@@ -62,7 +51,9 @@ def _collect_citation_uris_from_trace(trace_obj, seen: set, uris: list):
 
     walk(trace_obj)
 
+
 def invoke_agent_stream_with_citations(question: str, session_id: str):
+    """Stream agent output and return citation URIs extracted from trace events."""
     client = get_client()
 
     response = client.invoke_agent(
@@ -87,20 +78,19 @@ def invoke_agent_stream_with_citations(question: str, session_id: str):
 
     yield ("done", {"citations": citations, "trace_events": trace_events})
 
+
 def _short_name(uri: str) -> str:
+    """Convert an S3 URI to a display-friendly file name."""
     return uri.split("/")[-1] if uri else uri
 
-# ======================
-# Copilot-style Suggested Prompt Cards
-# ======================
 
 def render_suggested_prompts(prompts):
-    st.markdown("### 💡 Suggested Prompts")
+    """Render prompt cards and store the selected prompt in session state."""
+    st.markdown("### Suggested Prompts")
 
     st.markdown(
         """
         <style>
-        /* Card-like button shell */
         div.stButton > button {
             width: 100% !important;
             border-radius: 16px !important;
@@ -111,14 +101,11 @@ def render_suggested_prompts(prompts):
             background: white !important;
             transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
         }
-
         div.stButton > button:hover {
             box-shadow: 0 6px 18px rgba(0,0,0,0.08);
             transform: translateY(-1px);
             border-color: rgba(49, 51, 63, 0.30) !important;
         }
-
-        /* Default = question style */
         div.stButton > button > div,
         div.stButton > button > span,
         div.stButton > button p {
@@ -128,8 +115,6 @@ def render_suggested_prompts(prompts):
             font-size: 13.5px !important;
             color: rgba(49, 51, 63, 0.70) !important;
         }
-
-        /* Title style: first rendered line only */
         div.stButton > button > div::first-line,
         div.stButton > button > span::first-line,
         div.stButton > button p::first-line,
@@ -138,7 +123,6 @@ def render_suggested_prompts(prompts):
             font-size: 15px !important;
             color: rgba(15, 23, 42, 0.95) !important;
         }
-
         div.stButton > button:focus {
             outline: 2px solid rgba(0,0,0,0.12);
         }
@@ -150,13 +134,10 @@ def render_suggested_prompts(prompts):
     cols = st.columns(3)
     for i, (title, question) in enumerate(prompts):
         with cols[i % 3]:
-            label = f"💬 {title}\n{question}"
+            label = f"{title}\n{question}"
             if st.button(label, key=f"sp_{i}", use_container_width=True):
                 st.session_state.selected_prompt = question
 
-# ======================
-# Streamlit UI
-# ======================
 
 st.set_page_config(page_title="Auditing Smart FAQ Bot", page_icon="🤖", layout="centered")
 
@@ -173,8 +154,7 @@ st.markdown(
 )
 
 with st.sidebar:
-    st.subheader("Settings")
-    st.write("Team #: 41")
+    st.subheader("Team #: 41")
     st.write("Member 1: Sunny Hwang")
     st.write("Member 2: Chipo Shereni")
 
@@ -184,7 +164,7 @@ with st.sidebar:
         st.session_state.selected_prompt = None
         st.rerun()
 
-    # ✅ 확실한 HTML 렌더링 (텍스트로 안 보이게)
+    # Sidebar HTML banner.
     components.html(
         """
         <div style="
@@ -203,11 +183,11 @@ with st.sidebar:
 
             <div style="font-size:12.5px; color:#475569; line-height:1.45; margin-bottom:12px;">
                 Powered by AWS AI Services:<br/>
-                <span style="font-weight:600;">Bedrock</span> ·
+                <span style="font-weight:600;">Amazon Bedrock Agents</span> ·
                 <span style="font-weight:600;">Knowledge Bases</span> ·
                 <span style="font-weight:600;">S3</span> ·
-                <span style="font-weight:600;">Lambda</span> ·
-                <span style="font-weight:600;">OpenSearch</span> ·
+                <span style="font-weight:600;">S3 Vectors</span> ·
+                <span style="font-weight:600;">Titan Text Embeddings v2</span> ·
                 <span style="font-weight:600;">Lightsail</span>
             </div>
 
@@ -223,10 +203,10 @@ with st.sidebar:
             </div>
         </div>
         """,
-        height=230,  # ✅ 필요하면 240~280으로 조정
+        height=270,
     )
 
-# Initialize session state
+# Session state defaults.
 if "session_id" not in st.session_state:
     st.session_state.session_id = f"web-{uuid.uuid4()}"
 if "messages" not in st.session_state:
@@ -234,24 +214,19 @@ if "messages" not in st.session_state:
 if "selected_prompt" not in st.session_state:
     st.session_state.selected_prompt = None
 
-# Suggested prompts
 render_suggested_prompts(SUGGESTED_PROMPTS)
 
-# Render chat history
 for m in st.session_state.messages:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
         if m.get("citations"):
             st.caption("Sources: " + " | ".join(m["citations"]))
 
-# Chat input (typed)
 typed_input = st.chat_input("Ask a question from the FAQ PDF (e.g., refund policy).")
 
-# Determine user_input (typed has priority; else use selected prompt)
 selected_prompt = st.session_state.get("selected_prompt")
 user_input = typed_input if typed_input else selected_prompt
 
-# Clear selected prompt after use
 if selected_prompt and not typed_input:
     st.session_state.selected_prompt = None
 
